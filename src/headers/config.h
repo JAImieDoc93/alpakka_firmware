@@ -111,6 +111,7 @@ typedef struct __packed _Config {
     bool swap_gyros;
     bool touch_invert_polarity;
     uint8_t thumbstick_smooth_samples;
+    uint8_t gyro_stab;  // Gyro stabiliser: 0=build default, 1=OFF, 2=LOW_LATENCY, 3=BALANCED, 4=STRONG.
     uint8_t padding[256]; // Guarantee block is at least 256 bytes or more.
 } Config;
 
@@ -160,6 +161,7 @@ void config_set_swap_gyros(bool value);
 void config_set_touch_invert_polarity(bool value);
 void config_set_gyro_user_offset(int8_t x, int8_t y, int8_t z);
 void config_set_thumbstick_smooth_samples(uint8_t value);
+uint8_t config_get_gyro_stab();  // Stored value (0 = use build default).
 
 // Profiles.
 uint8_t config_get_profile();

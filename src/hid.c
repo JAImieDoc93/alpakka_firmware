@@ -124,6 +124,7 @@ void hid_procedure_press(uint8_t procedure){
     if (procedure == PROC_TUNE_MOUSE_SENS) config_tune_set_mode(procedure);
     if (procedure == PROC_TUNE_TOUCH_SENS) config_tune_set_mode(procedure);
     if (procedure == PROC_TUNE_DEADZONE) config_tune_set_mode(procedure);
+    if (procedure == PROC_TUNE_GYRO_STAB) config_tune_set_mode(procedure);
     if (procedure == PROC_CALIBRATE) config_calibrate();
     if (procedure == PROC_RESTART) power_restart();
     if (procedure == PROC_BOOTSEL) power_bootsel();  // TODO: BOORSEL_OR_PAIR

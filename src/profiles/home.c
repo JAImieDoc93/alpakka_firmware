@@ -193,8 +193,9 @@ void config_profile_default_home(CtrlProfile *profile){
         .actions={KEY_F6}
     };
     profile->sections[SECTION_RSTICK_PUSH].button = (CtrlButton){
-        .mode=NORMAL,
+        .mode=HOLD|LONG,
         .actions={KEY_BACKQUOTE},
+        .actions_secondary={PROC_TUNE_GYRO_STAB},
     };
 
     // Rotary.

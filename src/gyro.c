@@ -7,6 +7,7 @@
 #include "button.h"
 #include "config.h"
 #include "gyro.h"
+#include "gyro_filter.h"
 #include "common.h"
 #include "hid.h"
 #include "imu.h"
@@ -15,6 +16,41 @@
 #include "vector.h"
 
 double sensitivity_multiplier;
+
+#define GYRO_DPS_PER_LSB 0.0175  // LSM6DS 500dps scale (125dps IMU is pre-divided by 4).
+#define GYRO_STAB_DT_MIN 0.002f
+#define GYRO_STAB_DT_MAX 0.008f
+#define GYRO_STAB_GAP_RESET 0.020f  // s.
+
+static GyroStabMode gyro_stab_mode() {
+    return (GyroStabMode)(config_get_gyro_stab() - 1);  // Runtime (home menu) or build default.
+}
+
+// Filter raw gyro (calibrated counts) in deg/s. Returns false if disabled.
+static bool gyro_stabilise(Gyro *self, Vector *g) {
+    GyroStabMode mode = gyro_stab_mode();
+    if (mode != self->stab_mode) self->stab_running = false;  // Mode changed at runtime.
+    self->stab_mode = mode;
+    if (mode == GYRO_STAB_OFF) return false;
+    const GyroFilterParams *p = gyro_filter_params(mode);
+    uint64_t now = time_us_64();
+    float dt = (now - self->stab_last_us) / 1000000.0f;
+    // Not called for a while (e.g. home profile held): treat as new engagement.
+    if (dt > GYRO_STAB_GAP_RESET) self->stab_running = false;
+    if (!self->stab_running) {
+        // Fresh engagement: never carry state across gyro on/off.
+        for(uint8_t i=0; i<3; i++) gyro_filter_reset(&self->stab[i]);
+        self->stab_running = true;
+        dt = CFG_TICK_INTERVAL_IN_US / 1000000.0f;
+    }
+    self->stab_last_us = now;
+    if (dt < GYRO_STAB_DT_MIN) dt = GYRO_STAB_DT_MIN;
+    if (dt > GYRO_STAB_DT_MAX) dt = GYRO_STAB_DT_MAX;
+    g->x = gyro_filter_step(&self->stab[0], p, g->x * GYRO_DPS_PER_LSB, dt) / GYRO_DPS_PER_LSB;
+    g->y = gyro_filter_step(&self->stab[1], p, g->y * GYRO_DPS_PER_LSB, dt) / GYRO_DPS_PER_LSB;
+    g->z = gyro_filter_step(&self->stab[2], p, g->z * GYRO_DPS_PER_LSB, dt) / GYRO_DPS_PER_LSB;
+    return true;
+}
 
 uint8_t world_init = 0;
 Vector world_top;
@@ -151,6 +187,7 @@ void Gyro__report_absolute(Gyro *self) {
 void Gyro__report_incremental(Gyro *self) {
      // Read gyro values.
     Vector imu_gyro = imu_read_gyro();
+    gyro_stabilise(self, &imu_gyro);
     double x = imu_gyro.x * CFG_GYRO_SENSITIVITY_X * sensitivity_multiplier;
     double y = imu_gyro.y * CFG_GYRO_SENSITIVITY_Y * sensitivity_multiplier;
     double z = imu_gyro.z * CFG_GYRO_SENSITIVITY_Z * sensitivity_multiplier;
@@ -179,25 +216,29 @@ bool Gyro__is_engaged(Gyro *self) {
 }
 
 void Gyro__report(Gyro *self) {
+    bool incremental = false;
     if (self->mode == GYRO_MODE_TOUCH_ON) {
-        if (self->is_engaged(self)) self->report_incremental(self);
+        incremental = self->is_engaged(self);
     }
     else if (self->mode == GYRO_MODE_TOUCH_OFF) {
-        if (!self->is_engaged(self)) self->report_incremental(self);
+        incremental = !self->is_engaged(self);
     }
     else if (self->mode == GYRO_MODE_ALWAYS_ON) {
+        incremental = true;
+    }
+    if (incremental) {
         self->report_incremental(self);
-    }
-    else if (self->mode == GYRO_MODE_AXIS_ABSOLUTE) {
-        self->report_absolute(self);
-    }
-    else if (self->mode == GYRO_MODE_OFF) {
         return;
     }
+    // Disengaged: drop stabiliser state, residual motion is never emitted.
+    self->stab_running = false;
+    if (self->mode == GYRO_MODE_AXIS_ABSOLUTE) self->report_absolute(self);
 }
 
 void Gyro__reset(Gyro *self) {
     world_init = 0;
+    self->stab_running = false;
+    self->stab_mode = GYRO_STAB_OFF;
     self->pressed_x_pos = false;
     self->pressed_y_pos = false;
     self->pressed_z_pos = false;

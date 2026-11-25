@@ -1,5 +1,11 @@
 # Alpakka Firmware
 
+> **Unofficial experimental fork: adaptive gyro stabiliser (Alpakka v0 only).**
+> Adds a One Euro-style filter that smooths hand tremor on the gyro without adding noticeable delay, with four modes (OFF, LOW_LATENCY, BALANCED, STRONG). OFF behaves like stock.
+> Not made or supported by Input Labs. Use at your own risk. Roll back with the official 1.2.0 `.uf2`.
+> **Testers:** grab a `.uf2` from the [latest release](../../releases/latest), read [docs/gyro_stabiliser.md](docs/gyro_stabiliser.md), and tell us how it feels via [Issues](../../issues).
+> Status: simulation results are in `tests/results.md`. On real hardware only STRONG has been tried, by one user, and it felt good. Everything else needs testers.
+
 *Alpakka controller reference firmware (for Raspberry Pi Pico)*
 ## Project links
 - [Alpakka Manual](https://inputlabs.io/devices/alpakka/manual).

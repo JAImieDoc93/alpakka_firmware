@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stddef.h>
 #include <hardware/sync.h>
 #include <pico/unique_id.h>
 #include "config.h"
@@ -18,6 +19,7 @@
 #include "common.h"
 #include "logging.h"
 #include "power.h"
+#include "gyro_filter.h"
 
 // Config values.
 Config config_cache;
@@ -68,6 +70,16 @@ void config_profile_load(uint8_t index) {
     if (version < min_version) {
         debug("Config: Profile %i incompatible version (%lu)\n", index, version);
         config_profile_default(index, index);
+    }
+    // Gyro stabiliser: expose the tune entry on an existing home profile
+    // (home + long press DHat/RStick push) without resetting profiles.
+    // RAM only; stock firmware ignores this procedure if ever persisted.
+    if (profileIsHome) {
+        CtrlButton *push = &config_profile_cache[index].sections[SECTION_RSTICK_PUSH].button;
+        if (push->actions_secondary[0] == 0) {
+            push->mode = HOLD|LONG;
+            push->actions_secondary[0] = PROC_TUNE_GYRO_STAB;
+        }
     }
     // Tag as synced.
     config_profile_cache_synced[index] = true;
@@ -317,6 +329,16 @@ void config_tune_update_leds() {
         if (config_cache.sens_touch == 4) led_blink_mask(LED_LEFT + LED_UP);
         led_set_mode(LED_MODE_BLINK);
     }
+    if (config_tune_mode == PROC_TUNE_GYRO_STAB) {
+        // OFF: down. LOW_LATENCY: up. BALANCED: left+right. STRONG: all four.
+        uint8_t mode = config_get_gyro_stab();
+        led_static_mask(LED_NONE);
+        if (mode == 1) led_blink_mask(LED_DOWN);
+        if (mode == 2) led_blink_mask(LED_UP);
+        if (mode == 3) led_blink_mask(LED_LEFT + LED_RIGHT);
+        if (mode == 4) led_blink_mask(LED_UP + LED_DOWN + LED_LEFT + LED_RIGHT);
+        led_set_mode(LED_MODE_BLINK);
+    }
 }
 
 void config_tune_set_mode(uint8_t mode) {
@@ -338,6 +360,10 @@ void config_tune(bool direction) {
     }
     else if (config_tune_mode == PROC_TUNE_TOUCH_SENS) {
         config_set_touch_sens_preset(constrain(config_cache.sens_touch + value, 0, 4), true);
+    }
+    else if (config_tune_mode == PROC_TUNE_GYRO_STAB) {
+        config_cache.gyro_stab = constrain(config_get_gyro_stab() + value, 1, GYRO_STAB_MODES);
+        info("Config: gyro_stab=%i\n", config_cache.gyro_stab - 1);
     }
     config_cache_synced = false;
     config_tune_update_leds();
@@ -408,6 +434,16 @@ uint8_t config_get_protocol() {
 
 uint8_t config_get_touch_sens_preset() {
     return config_cache.sens_touch;
+}
+
+// The stabiliser byte must be inside the persisted part of the config block.
+_Static_assert(offsetof(Config, gyro_stab) < NVM_CONFIG_SIZE, "gyro_stab not persisted");
+
+uint8_t config_get_gyro_stab() {
+    // Unset or invalid: report the build default (stored as mode + 1).
+    uint8_t value = config_cache.gyro_stab;
+    if (value < 1 || value > GYRO_STAB_MODES) value = GYRO_STAB_DEFAULT + 1;
+    return value;
 }
 
 uint8_t config_get_mouse_sens_preset() {

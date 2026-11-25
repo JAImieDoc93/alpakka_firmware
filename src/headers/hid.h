@@ -262,6 +262,7 @@
 #define PROC_IGNORE_LED_WARNINGS  PROC_INDEX + 41
 #define PROC_SLEEP  PROC_INDEX + 42
 #define PROC_PAIR  PROC_INDEX + 43
+#define PROC_TUNE_GYRO_STAB  PROC_INDEX + 44  // Gyro stabiliser (custom, not upstream).
 
 typedef enum _ReportType {
     REPORT_KEYBOARD = 1,

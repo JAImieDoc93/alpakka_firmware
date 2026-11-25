@@ -2,6 +2,8 @@
 // Copyright (C) 2022, Input Labs Oy.
 
 #pragma once
+#include <stdint.h>
+#include "gyro_filter.h"
 
 typedef enum GyroMode_enum {
     GYRO_MODE_OFF,
@@ -45,6 +47,11 @@ struct Gyro_struct {
     float sens_x;
     float sens_y;
     float sens_z;
+    // Stabiliser state (see gyro_filter.h).
+    GyroFilterAxis stab[3];
+    bool stab_running;
+    GyroStabMode stab_mode;
+    uint64_t stab_last_us;
 };
 
 Gyro Gyro_ (

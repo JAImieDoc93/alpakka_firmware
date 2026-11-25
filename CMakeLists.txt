@@ -49,6 +49,11 @@ else()
     message(FATAL_ERROR "Target device not defined")
 endif()
 
+# Gyro stabiliser build-time default (0=OFF, 1=LOW_LATENCY, 2=BALANCED, 3=STRONG).
+if(DEFINED GYRO_STAB_DEFAULT)
+    target_compile_definitions(${PROJECT} PUBLIC GYRO_STAB_DEFAULT=${GYRO_STAB_DEFAULT})
+endif()
+
 # Enable all warnings and promote them to errors.
 target_compile_options(${PROJECT} PRIVATE -Wall -Werror)
 
@@ -86,6 +91,7 @@ target_sources(${PROJECT} PUBLIC
     src/esp.c
     src/glyph.c
     src/gyro.c
+    src/gyro_filter.c
     src/hid.c
     src/imu.c
     src/led.c
